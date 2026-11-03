@@ -4,7 +4,7 @@ import json
 import os
 import streamlit as st
 
-# Configuración de página optimizada para móvil
+# Configuración básica de página
 st.set_page_config(
     page_title="Calendario Turnos",
     page_icon="📅",
@@ -13,64 +13,96 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# CSS ESTRUCTURAL PARA PANTALLAS DE IPHONE (SAFARI / CHROME)
+# 1. ESTILOS CSS ADAPTATIVOS PARA PANTALLA DE CELULAR (iOS/Android)
 # -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Ocultar margen superior predeterminado */
+    /* Ajustes generales de contenedor móvil */
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 0.8rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 0.2rem !important;
-        padding-right: 0.2rem !important;
-        max-width: 100% !important;
-        overflow-x: hidden !important;
+        padding-left: 0.4rem !important;
+        padding-right: 0.4rem !important;
+        max-width: 480px !important; /* Ancho máximo estándar de smartphone */
+        margin: auto;
+    }
+    
+    /* Ocultar barra superior y pie de Streamlit */
+    header, footer { visibility: hidden !important; height: 0px !important; }
+    
+    /* Grilla responsiva de 7 columnas exactas */
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+        width: 100%;
+        margin-top: 8px;
+        box-sizing: border-box;
     }
 
-    /* Reducir tamaño del título en móviles */
-    h1 {
-        font-size: 1.5rem !important;
-        margin-bottom: 0.5rem !important;
+    .header-day {
         text-align: center;
+        font-weight: 700;
+        font-size: 11px;
+        color: #64748b;
+        padding: 4px 0;
+        text-transform: uppercase;
     }
 
-    /* Forzar que las 7 columnas ocupen EXACTAMENTE el 100% sin scroll horizontal */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        width: 100% !important;
-        gap: 1px !important;
-        justify-content: space-between !important;
+    .empty-cell {
+        background: transparent;
+        aspect-ratio: 1 / 1.1;
     }
 
-    /* Ajuste fino para cada una de las 7 columnas */
-    div[data-testid="column"] {
-        width: 14.28% !important;
-        min-width: 0px !important;
-        flex: 1 1 14.28% !important;
-        padding: 0px !important;
+    /* Tarjetas interactivas de días */
+    .day-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1 / 1.1;
+        border-radius: 6px;
+        text-decoration: none !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        box-sizing: border-box;
+        transition: transform 0.1s ease;
+        -webkit-tap-highlight-color: transparent;
     }
 
-    /* Formato táctil compacto para los botones del calendario */
-    div.stButton > button {
-        width: 100% !important;
-        height: 46px !important;
-        min-height: 46px !important;
-        padding: 1px 0px !important;
-        font-size: 10px !important;
-        font-weight: bold !important;
-        line-height: 1.1 !important;
-        white-space: pre-wrap !important;
-        border-radius: 4px !important;
-        margin: 0px !important;
+    .day-card:active {
+        transform: scale(0.93);
     }
 
-    /* Formato específico para inputs de horas */
-    div[data-testid="stNumberInput"] input {
-        font-size: 12px !important;
-        padding: 4px !important;
+    .day-num {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 2px;
+    }
+
+    .day-state {
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        line-height: 1;
+    }
+
+    /* Esquema de colores por turno */
+    .state-desc {
+        background-color: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
+    .state-t1 {
+        background-color: #bae6fd;
+        color: #0369a1;
+        border: 1px solid #7dd3fc;
+    }
+    .state-t2 {
+        background-color: #fed7aa;
+        color: #c2410c;
+        border: 1px solid #fdba74;
     }
     </style>
 """,
@@ -78,7 +110,7 @@ st.markdown(
 )
 
 # -------------------------------------------------------------
-# PERSISTENCIA DE DATOS (GUARDADO AUTOMÁTICO JSON)
+# 2. PERSISTENCIA DE DATOS EN ARCHIVO JSON
 # -------------------------------------------------------------
 ARCHIVO_DATOS = "turnos.json"
 
@@ -110,6 +142,7 @@ def guardar_datos():
     json.dump(datos, f)
 
 
+# Carga inicial de estado
 if "cargado" not in st.session_state:
   turnos, h1, h2 = cargar_datos()
   st.session_state.turnos = turnos
@@ -120,11 +153,35 @@ if "cargado" not in st.session_state:
   st.session_state.cargado = True
 
 # -------------------------------------------------------------
-# VISTA INTERACTIVA
+# 3. INTERACCIÓN POR EVENTOS DE CLICK (QUERY PARAMS)
 # -------------------------------------------------------------
-st.markdown("<h1>📅 Turnos ARAMARK</h1>", unsafe_allow_html=True)
+params = st.query_params
+if "toggle" in params:
+  try:
+    dia_cliqueado = int(params["toggle"])
+    clave = (st.session_state.anio, st.session_state.mes, dia_cliqueado)
+    estado_actual = st.session_state.turnos.get(clave, "DESCANSO")
+    ciclo = ["DESCANSO", "T1", "T2"]
+    siguiente_estado = ciclo[(ciclo.index(estado_actual) + 1) % len(ciclo)]
 
-# Configuración de horas
+    st.session_state.turnos[clave] = siguiente_estado
+    guardar_datos()
+  except Exception:
+    pass
+
+  st.query_params.clear()
+  st.rerun()
+
+# -------------------------------------------------------------
+# 4. VISTA DE LA APLICACIÓN
+# -------------------------------------------------------------
+st.markdown(
+    "<h3 style='text-align: center; margin: 0 0 10px 0;'>📅 Turnos"
+    " ARAMARK</h3>",
+    unsafe_allow_html=True,
+)
+
+# Ajuste de Horas
 col_h1, col_h2 = st.columns(2)
 with col_h1:
   h1_val = st.number_input(
@@ -142,9 +199,9 @@ with col_h2:
     st.session_state.hrs_t2 = h2_val
     guardar_datos()
 
-# Navegación mensual
+# Navegación de Meses
 col_m1, col_m2, col_m3 = st.columns([1, 2, 1])
-if col_m1.button("◄", key="btn_prev_mes"):
+if col_m1.button("◄", key="prev_month"):
   if st.session_state.mes == 1:
     st.session_state.mes = 12
     st.session_state.anio -= 1
@@ -152,7 +209,7 @@ if col_m1.button("◄", key="btn_prev_mes"):
     st.session_state.mes -= 1
   st.rerun()
 
-meses = [
+meses_nombres = [
     "",
     "Enero",
     "Febrero",
@@ -168,11 +225,12 @@ meses = [
     "Diciembre",
 ]
 col_m2.markdown(
-    f"<h4 style='text-align: center; margin: 4px 0;'>{meses[st.session_state.mes]} {st.session_state.anio}</h4>",
+    f"<h4 style='text-align: center; margin: 5px 0;'>"
+    f"{meses_nombres[st.session_state.mes]} {st.session_state.anio}</h4>",
     unsafe_allow_html=True,
 )
 
-if col_m3.button("►", key="btn_next_mes"):
+if col_m3.button("►", key="next_month"):
   if st.session_state.mes == 12:
     st.session_state.mes = 1
     st.session_state.anio += 1
@@ -180,37 +238,51 @@ if col_m3.button("►", key="btn_next_mes"):
     st.session_state.mes += 1
   st.rerun()
 
-# Cabecera de días
+# -------------------------------------------------------------
+# 5. CONSTRUCCIÓN DE LA GRILLA HTML EN PANTALLA CELULAR
+# -------------------------------------------------------------
+html_grid = ['<div class="calendar-grid">']
+
+# Encabezados de días
 dias_semana = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"]
-cols_head = st.columns(7)
-for idx, dia in enumerate(dias_semana):
-  cols_head[idx].markdown(
-      f"<div style='text-align:center; font-weight:bold; font-size:11px;'>{dia}</div>",
-      unsafe_allow_html=True,
-  )
+for dia_head in dias_semana:
+  html_grid.append(f'<div class="header-day">{dia_head}</div>')
 
-# Grilla de días
+# Matriz del calendario
 matriz = calendar.monthcalendar(st.session_state.anio, st.session_state.mes)
-ciclo = ["DESCANSO", "T1", "T2"]
 
-for idx_sem, semana in enumerate(matriz):
-  cols = st.columns(7)
-  for idx_dia, dia in enumerate(semana):
-    if dia != 0:
+for semana in matriz:
+  for dia in semana:
+    if dia == 0:
+      html_grid.append('<div class="empty-cell"></div>')
+    else:
       clave = (st.session_state.anio, st.session_state.mes, dia)
       estado = st.session_state.turnos.get(clave, "DESCANSO")
 
-      lbl = f"{dia}\nDesc" if estado == "DESCANSO" else f"{dia}\n{estado}"
+      clase_css = "state-desc"
+      txt_estado = "DESC"
+      if estado == "T1":
+        clase_css = "state-t1"
+        txt_estado = "T1"
+      elif estado == "T2":
+        clase_css = "state-t2"
+        txt_estado = "T2"
 
-      if cols[idx_dia].button(
-          lbl, key=f"d_{st.session_state.anio}_{st.session_state.mes}_{dia}"
-      ):
-        next_idx = (ciclo.index(estado) + 1) % len(ciclo)
-        st.session_state.turnos[clave] = ciclo[next_idx]
-        guardar_datos()
-        st.rerun()
+      html_grid.append(f"""
+                <a href="?toggle={dia}" target="_self" class="day-card {clase_css}">
+                    <span class="day-num">{dia}</span>
+                    <span class="day-state">{txt_estado}</span>
+                </a>
+            """)
 
-# Cálculo de totales
+html_grid.append("</div>")
+
+# Renderizar grilla HTML completa
+st.markdown("".join(html_grid), unsafe_allow_html=True)
+
+# -------------------------------------------------------------
+# 6. RESUMEN Y HORAS TOTALES
+# -------------------------------------------------------------
 cnt_t1, cnt_t2, cnt_desc = 0, 0, 0
 dias_mes = calendar.monthrange(st.session_state.anio, st.session_state.mes)[1]
 
@@ -231,5 +303,5 @@ total_hrs = (cnt_t1 * st.session_state.hrs_t1) + (
 st.divider()
 st.metric("Total Horas Trabajadas", f"{total_hrs:.1f} hrs")
 st.caption(
-    f"**T1:** {cnt_t1} d | **T2:** {cnt_t2} d | **Desc:** {cnt_desc} d"
+    f"**T1:** {cnt_t1} d | **T2:** {cnt_t2} d | **Descansos:** {cnt_desc} d"
 )
