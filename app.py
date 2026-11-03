@@ -1,8 +1,8 @@
 import calendar
 import datetime
 import json
-import os
 import streamlit as st
+import streamlit.components.v1 as components
 
 # -------------------------------------------------------------
 # 1. CONFIGURACIÓN DE PÁGINA
@@ -14,197 +14,291 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# -------------------------------------------------------------
-# 2. ESTILOS CSS: FORZAR 7 COLUMNAS HORIZONTALES EN MÓVIL
-# -------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Reset de márgenes en pantalla móvil */
+    /* Ajuste de contenedor móvil sin romper el layout nativo */
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 0.6rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 0.2rem !important;
-        padding-right: 0.2rem !important;
-        max-width: 460px !important;
+        padding-left: 0.3rem !important;
+        padding-right: 0.3rem !important;
+        max-width: 480px !important;
         margin: auto;
     }
-    
-    /* Ocultar barra de navegación superior de Streamlit */
-    header[data-testid="stHeader"], footer, #MainMenu {
-        display: none !important;
-    }
-
-    /* FORZAR 7 COLUMNAS EN UNA SOLA FILA HORIZONTAL (Sin apilar en vertical) */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        gap: 2px !important;
-        width: 100% !important;
-        margin-bottom: 2px !important;
-    }
-
-    div[data-testid="column"], div[data-testid="stColumn"] {
-        width: 14.285% !important;
-        min-width: 0 !important;
-        max-width: 14.285% !important;
-        flex: 1 1 14.285% !important;
-        padding: 0 !important;
-    }
-
-    /* ESTILO DE LOS BOTONES TÁCTILES DEL CALENDARIO */
-    div[data-testid="stColumn"] button {
-        width: 100% !important;
-        min-height: 48px !important;
-        height: 48px !important;
-        padding: 2px 0px !important;
-        margin: 0 !important;
-        border-radius: 6px !important;
-        font-size: 11px !important;
-        line-height: 1.1 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        align-items: center !important;
-        text-align: center !important;
-        white-space: pre-wrap !important;
-        -webkit-tap-highlight-color: transparent !important;
-        transition: transform 0.08s ease !important;
-    }
-
-    div[data-testid="stColumn"] button:active {
-        transform: scale(0.92) !important;
-    }
-
-    div[data-testid="stColumn"] button p {
-        font-size: 11px !important;
-        font-weight: 800 !important;
-        margin: 0 !important;
-        line-height: 1.1 !important;
-    }
-
-    /* COLORES POR ESTADO DE TURNO VÍA ARIA-LABEL */
-    /* Descanso */
-    div[data-testid="stColumn"] button[aria-label*="DESC"] {
-        background-color: #1e293b !important;
-        color: #cbd5e1 !important;
-        border: 1px solid #334155 !important;
-    }
-
-    /* Turno 1 (Azul) */
-    div[data-testid="stColumn"] button[aria-label*="T1"] {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
-        border: 1px solid #38bdf8 !important;
-        box-shadow: 0 1px 3px rgba(2, 132, 199, 0.4) !important;
-    }
-
-    /* Turno 2 (Naranja) */
-    div[data-testid="stColumn"] button[aria-label*="T2"] {
-        background-color: #ea580c !important;
-        color: #ffffff !important;
-        border: 1px solid #fb923c !important;
-        box-shadow: 0 1px 3px rgba(234, 88, 12, 0.4) !important;
-    }
-
-    /* Día de Hoy (Borde verde) */
-    div[data-testid="stColumn"] button[aria-label*="★"] {
-        box-shadow: 0 0 0 2px #10b981 !important;
-    }
-
-    /* Encabezados de días de la semana */
-    .day-header {
-        text-align: center;
-        font-weight: 800;
-        font-size: 11px;
-        color: #94a3b8;
-        padding: 4px 0;
-        text-transform: uppercase;
-    }
-
-    .empty-cell {
-        height: 48px;
-        width: 100%;
-        background: transparent;
-    }
+    header, footer, #MainMenu { display: none !important; }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
 # -------------------------------------------------------------
-# 3. PERSISTENCIA DE DATOS JSON
+# 2. COMPONENTE WEB INTERACTIVO (JS + CSS GRID 7 COLUMNAS)
 # -------------------------------------------------------------
-ARCHIVO_DATOS = "turnos.json"
-
-
-def fecha_key(anio: int, mes: int, dia: int) -> str:
-  return f"{anio:04d}-{mes:02d}-{dia:02d}"
-
-
-def cargar_datos():
-  if os.path.exists(ARCHIVO_DATOS):
-    try:
-      with open(ARCHIVO_DATOS, "r", encoding="utf-8") as f:
-        datos = json.load(f)
-        return (
-            datos.get("turnos", {}),
-            float(datos.get("hrs_t1", 8.0)),
-            float(datos.get("hrs_t2", 8.0)),
-        )
-    except Exception:
-      pass
-  return {}, 8.0, 8.0
-
-
-def guardar_datos():
-  datos = {
-      "turnos": st.session_state.turnos,
-      "hrs_t1": st.session_state.hrs_t1,
-      "hrs_t2": st.session_state.hrs_t2,
+HTML_CALENDARIO = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  * {
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  with open(ARCHIVO_DATOS, "w", encoding="utf-8") as f:
-    json.dump(datos, f, ensure_ascii=False, indent=2)
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+    color: #f8fafc;
+  }
+  .app-card {
+    background: #0f172a;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border: 1px solid #1e293b;
+  }
+  .header {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+  .sub-header {
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-bottom: 12px;
+  }
+  .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 4px;
+  }
+  .nav-btn {
+    background: #334155;
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .nav-btn:active { transform: scale(0.93); }
+  .today-btn {
+    background: #10b981;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .title-mes {
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+    flex-grow: 1;
+  }
+  
+  /* GRILLA 7 COLUMNAS IMPOSIBLE DE COLAPSAR EN MÓVIL */
+  .grid-calendar {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 4px !important;
+    width: 100% !important;
+  }
+  .day-head {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    padding: 4px 0;
+  }
+  .day-cell {
+    aspect-ratio: 1 / 1.15;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.05s ease, background 0.15s ease;
+  }
+  .day-cell:active { transform: scale(0.90); }
+  .day-num { font-size: 13px; font-weight: 800; line-height: 1; }
+  .day-state { font-size: 8.5px; font-weight: 800; text-transform: uppercase; margin-top: 3px; line-height: 1; }
+  .empty-cell { aspect-ratio: 1 / 1.15; }
 
+  /* COLORES DE TURNOS */
+  .DESC { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+  .T1 { background: #0284c7; color: #ffffff; border: 1px solid #38bdf8; box-shadow: 0 2px 4px rgba(2,132,199,0.3); }
+  .T2 { background: #ea580c; color: #ffffff; border: 1px solid #fb923c; box-shadow: 0 2px 4px rgba(234,88,12,0.3); }
+  .is-today { outline: 2px solid #10b981; outline-offset: -1px; }
 
-if "cargado" not in st.session_state:
-  turnos, h1, h2 = cargar_datos()
-  st.session_state.turnos = turnos
-  st.session_state.hrs_t1 = h1
-  st.session_state.hrs_t2 = h2
-  st.session_state.mes = datetime.date.today().month
-  st.session_state.anio = datetime.date.today().year
-  st.session_state.cargado = True
+  /* MÉTRICAS EN TIEMPO REAL */
+  .metrics-box {
+    display: flex;
+    justify-content: space-around;
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 14px;
+    border: 1px solid #334155;
+  }
+  .metric-item { text-align: center; }
+  .metric-val { font-size: 18px; font-weight: 800; color: #38bdf8; }
+  .metric-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
+</style>
+</head>
+<body>
 
+<div class="app-card">
+  <div class="header">📅 Turnos ARAMARK</div>
+  <div class="sub-header">Toca cualquier día: <b>DESC ➔ T1 ➔ T2</b></div>
 
-# -------------------------------------------------------------
-# 4. CALLBACKS INSTANTÁNEOS (SIN RECARGAR PÁGINA)
-# -------------------------------------------------------------
-def toggle_turno(fecha_str: str):
-  ciclo = ["DESCANSO", "T1", "T2"]
-  actual = st.session_state.turnos.get(fecha_str, "DESCANSO")
-  siguiente = ciclo[(ciclo.index(actual) + 1) % len(ciclo)]
-  st.session_state.turnos[fecha_str] = siguiente
-  guardar_datos()
+  <div class="nav-bar">
+    <button class="nav-btn" id="prevBtn">◄</button>
+    <div class="title-mes" id="mesTitle"></div>
+    <button class="nav-btn" id="nextBtn">►</button>
+    <button class="today-btn" id="todayBtn">Hoy</button>
+  </div>
 
+  <div class="grid-calendar" id="gridCalendar"></div>
 
-def prev_mes():
-  if st.session_state.mes == 1:
-    st.session_state.mes = 12
-    st.session_state.anio -= 1
-  else:
-    st.session_state.mes -= 1
+  <div class="metrics-box">
+    <div class="metric-item">
+      <div class="metric-val" id="totalHrs">0 hrs</div>
+      <div class="metric-lbl">Total Horas</div>
+    </div>
+    <div class="metric-item">
+      <div class="metric-val" style="color:#10b981;" id="totalDias">0 d</div>
+      <div class="metric-lbl">Trabajados</div>
+    </div>
+    <div class="metric-item">
+      <div class="metric-val" style="color:#94a3b8;" id="totalDesc">0 d</div>
+      <div class="metric-lbl">Descansos</div>
+    </div>
+  </div>
+</div>
 
+<script>
+  const mesesNombres = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const diasNombres = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
+  
+  let fechaActual = new Date();
+  let mesSel = fechaActual.getMonth() + 1;
+  let anioSel = fechaActual.getFullYear();
+  let hrsT1 = 8.0;
+  let hrsT2 = 8.0;
 
-def next_mes():
-  if st.session_state.mes == 12:
-    st.session_state.mes = 1
-    st.session_state.anio += 1
-  else:
-    st.session_state.mes += 1
+  // Cargar turnos guardados localmente en el celular
+  let turnos = JSON.parse(localStorage.getItem('aramark_turnos') || '{}');
 
+  function guardarTurnos() {
+    localStorage.setItem('aramark_turnos', JSON.stringify(turnos));
+  }
 
-def ir_hoy():
-  hoy = datetime.date.today()
+  function getClave(y, m, d) {
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  function renderizar() {
+    document.getElementById('mesTitle').innerText = `${mesesNombres[mesSel]} ${anioSel}`;
+    const grid = document.getElementById('gridCalendar');
+    grid.innerHTML = '';
+
+    // Headers días
+    diasNombres.forEach(d => {
+      const h = document.createElement('div');
+      h.className = 'day-head';
+      h.innerText = d;
+      grid.appendChild(h);
+    });
+
+    // Calcular días del mes
+    const primerDia = new Date(anioSel, mesSel - 1, 1).getDay();
+    // Ajustar domingo=0 a lunes=0
+    const offset = (primerDia === 0 ? 6 : primerDia - 1);
+    const totalDias = new Date(anioSel, mesSel, 0).getDate();
+
+    for (let i = 0; i < offset; i++) {
+      const emp = document.createElement('div');
+      emp.className = 'empty-cell';
+      grid.appendChild(emp);
+    }
+
+    let cntT1 = 0, cntT2 = 0, cntDesc = 0;
+    const hoy = new Date();
+
+    for (let d = 1; d <= totalDias; d++) {
+      const clave = getClave(anioSel, mesSel, d);
+      const estado = turnos[clave] || 'DESCANSO';
+
+      if (estado === 'T1') cntT1++;
+      else if (estado === 'T2') cntT2++;
+      else cntDesc++;
+
+      const cell = document.createElement('div');
+      const esHoy = (hoy.getFullYear() === anioSel && (hoy.getMonth() + 1) === mesSel && hoy.getDate() === d);
+      cell.className = `day-cell ${estado} ${esHoy ? 'is-today' : ''}`;
+
+      cell.innerHTML = `
+        <span class="day-num">${d}</span>
+        <span class="day-state">${estado === 'DESCANSO' ? 'DESC' : estado}</span>
+      `;
+
+      // Cambio instantáneo de turno sin reload
+      cell.onclick = () => {
+        const ciclo = ['DESCANSO', 'T1', 'T2'];
+        const actual = turnos[clave] || 'DESCANSO';
+        turnos[clave] = ciclo[(ciclo.indexOf(actual) + 1) % ciclo.length];
+        guardarTurnos();
+        renderizar();
+      };
+
+      grid.appendChild(cell);
+    }
+
+    // Actualizar métricas
+    const totalHoras = (cntT1 * hrsT1) + (cntT2 * hrsT2);
+    document.getElementById('totalHrs').innerText = `${totalHoras.toFixed(1)} h`;
+    document.getElementById('totalDias').innerText = `${cntT1 + cntT2} d`;
+    document.getElementById('totalDesc').innerText = `${cntDesc} d`;
+  }
+
+  document.getElementById('prevBtn').onclick = () => {
+    if (mesSel === 1) { mesSel = 12; anioSel--; }
+    else { mesSel--; }
+    renderizar();
+  };
+
+  document.getElementById('nextBtn').onclick = () => {
+    if (mesSel === 12) { mesSel = 1; anioSel++; }
+    else { mesSel++; }
+    renderizar();
+  };
+
+  document.getElementById('todayBtn').onclick = () => {
+    const h = new Date();
+    mesSel = h.getMonth() + 1;
+    anioSel = h.getFullYear();
+    renderizar();
+  };
+
+  renderizar();
+</script>
+</body>
+</html>
+"""
+
+# Renderizado dentro de Streamlit (sin recargas de pantalla)
+components.html(HTML_CALENDARIO, height=520, scrolling=False)
