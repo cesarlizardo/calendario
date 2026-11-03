@@ -14,9 +14,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# -------------------------------------------------------------
-# 2. PERSISTENCIA DE DATOS (JSON)
-# -------------------------------------------------------------
 ARCHIVO_DATOS = "turnos.json"
 
 
@@ -59,7 +56,7 @@ if "cargado" not in st.session_state:
   st.session_state.cargado = True
 
 # -------------------------------------------------------------
-# 3. INTERACCIÓN POR QUERY PARAMS (CLICS RÁPIDOS)
+# 2. EVENTOS VÍA QUERY PARAMS (CLICS RÁPIDOS)
 # -------------------------------------------------------------
 params = st.query_params
 
@@ -102,7 +99,7 @@ if "nav" in params:
   st.rerun()
 
 # -------------------------------------------------------------
-# 4. RENDERIZADO DEL CALENDARIO (UN SOLO BLOQUE HTML/CSS)
+# 3. RENDERIZADO DEL CALENDARIO (HTML SIN SANGRÍA PARA EVITAR TEXTO PLANO)
 # -------------------------------------------------------------
 meses_nombres = [
     "",
@@ -125,182 +122,110 @@ hoy_fecha = datetime.date.today()
 matriz = calendar.monthcalendar(st.session_state.anio, st.session_state.mes)
 dias_semana = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"]
 
-html_content = [f"""
-<style>
-/* Forzar ajuste responsivo en smartphones */
-.block-container {{
-    padding-top: 0.6rem !important;
-    padding-bottom: 1rem !important;
-    padding-left: 0.3rem !important;
-    padding-right: 0.3rem !important;
-    max-width: 440px !important;
-    margin: auto;
-}}
+html = []
 
-/* Ocultar barra de Streamlit */
-header, footer, #MainMenu {{
-    display: none !important;
-}}
+# CSS Ajustado
+html.append("<style>")
+html.append(
+    ".block-container { padding: 0.5rem 0.2rem !important; max-width: 440px"
+    " !important; margin: auto; }"
+)
+html.append("header, footer, #MainMenu { display: none !important; }")
+html.append(
+    ".app-title { text-align: center; font-size: 18px; font-weight: 800; margin:"
+    " 0; }"
+)
+html.append(
+    ".app-sub { text-align: center; font-size: 11px; color: #94a3b8;"
+    " margin-bottom: 8px; }"
+)
+html.append(
+    ".cal-nav { display: flex; align-items: center; justify-content:"
+    " space-between; margin-bottom: 8px; gap: 4px; }"
+)
+html.append(
+    ".cal-nav-btn { background: #334155; color: #fff !important;"
+    " text-decoration: none !important; padding: 6px 14px; border-radius: 6px;"
+    " font-weight: 700; font-size: 13px; }"
+)
+html.append(
+    ".cal-today-btn { background: #10b981; color: #fff !important;"
+    " text-decoration: none !important; padding: 6px 10px; border-radius: 6px;"
+    " font-weight: 700; font-size: 11px; }"
+)
+html.append(
+    ".cal-title { font-size: 15px; font-weight: 800; text-align: center;"
+    " flex-grow: 1; }"
+)
+html.append(
+    ".cal-grid { display: grid !important; grid-template-columns: repeat(7, 1fr)"
+    " !important; gap: 3px !important; width: 100% !important; box-sizing:"
+    " border-box !important; }"
+)
+html.append(
+    ".cal-head { text-align: center; font-weight: 800; font-size: 11px; color:"
+    " #94a3b8; padding: 4px 0; text-transform: uppercase; }"
+)
+html.append(
+    ".cal-empty { width: 100%; height: 44px; background: transparent; }"
+)
+html.append(
+    ".cal-card { display: flex; flex-direction: column; align-items: center;"
+    " justify-content: center; height: 44px; border-radius: 6px;"
+    " text-decoration: none !important; box-sizing: border-box;"
+    " -webkit-tap-highlight-color: transparent; transition: transform 0.08s"
+    " ease; }"
+)
+html.append(".cal-card:active { transform: scale(0.92); }")
+html.append(
+    ".cal-num { font-size: 12px; font-weight: 800; line-height: 1;"
+    " margin-bottom: 2px; }"
+)
+html.append(
+    ".cal-state { font-size: 8px; font-weight: 800; text-transform: uppercase;"
+    " line-height: 1; }"
+)
+html.append(
+    ".st-desc { background: #1e293b; color: #cbd5e1 !important; border: 1px"
+    " solid #334155; }"
+)
+html.append(
+    ".st-t1 { background: #0284c7; color: #fff !important; border: 1px solid"
+    " #38bdf8; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.4); }"
+)
+html.append(
+    ".st-t2 { background: #ea580c; color: #fff !important; border: 1px solid"
+    " #fb923c; box-shadow: 0 1px 3px rgba(234, 88, 12, 0.4); }"
+)
+html.append(
+    ".is-today { outline: 2px solid #10b981 !important; outline-offset:"
+    " -1px; }"
+)
+html.append("</style>")
 
-/* Encabezado */
-.app-title {{
-    text-align: center;
-    font-size: 18px;
-    font-weight: 800;
-    margin: 0 0 2px 0;
-}}
-.app-subtitle {{
-    text-align: center;
-    font-size: 11px;
-    color: #94a3b8;
-    margin-bottom: 8px;
-}}
+# Encabezado HTML
+html.append('<div class="app-title">📅 Turnos ARAMARK</div>')
+html.append(
+    '<div class="app-sub">Toca cualquier día: <b>DESC ➔ T1 ➔ T2</b></div>'
+)
 
-/* Barra de navegación de meses */
-.cal-nav {{
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    margin-bottom: 8px !important;
-    gap: 4px;
-}}
+# Barra Navegación
+html.append('<div class="cal-nav">')
+html.append('<a href="?nav=prev" target="_self" class="cal-nav-btn">◄</a>')
+html.append(f'<div class="cal-title">{nombre_mes} {st.session_state.anio}</div>')
+html.append('<a href="?nav=next" target="_self" class="cal-nav-btn">►</a>')
+html.append('<a href="?nav=hoy" target="_self" class="cal-today-btn">Hoy</a>')
+html.append("</div>")
 
-.cal-nav-btn {{
-    background-color: #334155;
-    color: #ffffff !important;
-    text-decoration: none !important;
-    padding: 6px 14px;
-    border-radius: 6px;
-    font-weight: 700;
-    font-size: 13px;
-    text-align: center;
-    -webkit-tap-highlight-color: transparent;
-}}
-
-.cal-today-btn {{
-    background-color: #10b981;
-    color: #ffffff !important;
-    text-decoration: none !important;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-weight: 700;
-    font-size: 11px;
-    text-align: center;
-    -webkit-tap-highlight-color: transparent;
-}}
-
-.cal-nav-title {{
-    font-size: 15px;
-    font-weight: 800;
-    text-align: center;
-    flex-grow: 1;
-}}
-
-/* GRILLA HTML INDESTRUCTIBLE DE 7 COLUMNAS EN MÓVIL */
-.cal-grid {{
-    display: grid !important;
-    grid-template-columns: repeat(7, 1fr) !important;
-    gap: 3px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}}
-
-.cal-head-day {{
-    text-align: center;
-    font-weight: 800;
-    font-size: 11px;
-    color: #94a3b8;
-    padding: 4px 0;
-    text-transform: uppercase;
-}}
-
-.cal-empty {{
-    width: 100%;
-    height: 46px;
-    background: transparent;
-}}
-
-.cal-card {{
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 46px !important;
-    border-radius: 6px !important;
-    text-decoration: none !important;
-    box-sizing: border-box !important;
-    -webkit-tap-highlight-color: transparent !important;
-    transition: transform 0.08s ease;
-    user-select: none;
-}}
-
-.cal-card:active {{
-    transform: scale(0.92);
-}}
-
-.cal-num {{
-    font-size: 12px;
-    font-weight: 800;
-    line-height: 1;
-    margin-bottom: 2px;
-}}
-
-.cal-state {{
-    font-size: 8px;
-    font-weight: 800;
-    text-transform: uppercase;
-    line-height: 1;
-}}
-
-/* ESTADOS DE COLORES (Alta Visibilidad) */
-.st-desc {{
-    background-color: #1e293b;
-    color: #cbd5e1 !important;
-    border: 1px solid #334155;
-}}
-
-.st-t1 {{
-    background-color: #0284c7;
-    color: #ffffff !important;
-    border: 1px solid #38bdf8;
-    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.4);
-}}
-
-.st-t2 {{
-    background-color: #ea580c;
-    color: #ffffff !important;
-    border: 1px solid #fb923c;
-    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.4);
-}}
-
-.is-today {{
-    box-shadow: 0 0 0 2px #10b981 !important;
-}}
-</style>
-
-<div class="app-title">📅 Turnos ARAMARK</div>
-<div class="app-subtitle">Toca cualquier día para alternar: <b>DESC ➔ T1 ➔ T2</b></div>
-
-<div class="cal-nav">
-    <a href="?nav=prev" target="_self" class="cal-nav-btn">◄</a>
-    <div class="cal-nav-title">{nombre_mes} {st.session_state.anio}</div>
-    <a href="?nav=next" target="_self" class="cal-nav-btn">►</a>
-    <a href="?nav=hoy" target="_self" class="cal-today-btn">Hoy</a>
-</div>
-
-<div class="cal-grid">
-"""]
-
-# Encabezado días de la semana
+# Grilla de 7 Columnas
+html.append('<div class="cal-grid">')
 for d in dias_semana:
-  html_content.append(f'<div class="cal-head-day">{d}</div>')
+  html.append(f'<div class="cal-head">{d}</div>')
 
-# Días del mes
 for semana in matriz:
   for dia in semana:
     if dia == 0:
-      html_content.append('<div class="cal-empty"></div>')
+      html.append('<div class="cal-empty"></div>')
     else:
       clave = fecha_key(st.session_state.anio, st.session_state.mes, dia)
       estado = st.session_state.turnos.get(clave, "DESCANSO")
@@ -321,20 +246,20 @@ for semana in matriz:
       )
       clase_hoy = " is-today" if es_hoy else ""
 
-      html_content.append(f"""
-                <a href="?toggle={dia}" target="_self" class="cal-card {clase_css}{clase_hoy}">
-                    <span class="cal-num">{dia}</span>
-                    <span class="cal-state">{txt_estado}</span>
-                </a>
-            """)
+      # Se escribe en una sola línea sin espacios iniciales
+      html.append(
+          f'<a href="?toggle={dia}" target="_self" class="cal-card'
+          f' {clase_css}{clase_hoy}"><span class="cal-num">{dia}</span><span'
+          f' class="cal-state">{txt_estado}</span></a>'
+      )
 
-html_content.append("</div>")
+html.append("</div>")
 
-# Renderizar TODO en un único bloque de HTML
-st.markdown("".join(html_content), unsafe_allow_html=True)
+# Renderizar en Streamlit
+st.markdown("".join(html), unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 5. RESUMEN Y MÉTRICAS DE HORAS
+# 4. RESUMEN Y MÉTRICAS
 # -------------------------------------------------------------
 cnt_t1, cnt_t2, cnt_desc = 0, 0, 0
 dias_mes = calendar.monthrange(st.session_state.anio, st.session_state.mes)[1]
@@ -367,7 +292,7 @@ st.caption(
 )
 
 # -------------------------------------------------------------
-# 6. CONFIGURACIÓN Y ROTAS AUTOMÁTICAS
+# 5. CONFIGURACIÓN Y ROTA RÁPIDA
 # -------------------------------------------------------------
 with st.expander("⚙️ Ajustes de Horas y Llenado Rápido", expanded=False):
   col_h1, col_h2 = st.columns(2)
